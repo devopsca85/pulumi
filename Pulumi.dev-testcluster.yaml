@@ -1,5 +1,5 @@
 config:
-  azure-native:location: westus2
-  new-testingpulumi:location: westus2.
+  azure-native:location: eastus2
+  new-testingpulumi:location: eastus2.
   new-testingpulumi:mgmtGroupId: "65947c44-db5d-45ec-81df-0e31dbf6f1bc"
   new-testingpulumi:sshPubKey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDYW0slzMfh/2DfiZ+OXv8AWfEQ4o/GaftIUoVuArL/f3WRajQx0pi57N44qq+jIGPhThEcLc6Ve9VyElkfjCS1opAyHFduLVfmhzjJYzXgUpMaFgI4tdX4H0EXhnQlpMs7MXGdrOgmZoDzRJneYk4Ao4GMrFBy0YIgFgkjm/otZxsn6H6se6BtRJMjEjSazz3iXFHuOppW9tBaN6CcrdSy5brXiEjoREejdmbocsv73t4F24+JQzHwHkoLeRebj0UpB+sBVl2uLHDpKfAFtxySut3fKoSetvCyyKeedbgzRSUd15U2DPAqUaM/pchLbS5QlAo3J28akjTRgQDViyPlObBznMsBFk/uScP8ih0YzyN0njeijRIn0Pq4/BSj82YZg+MWJf3EYa1ZPCRDBqL4KHZKzmEIwdIwrOumGTg15SsG82hIpWe8GEjaRQd9DSv08WdiAHHY4BORDQByWZb1MwGsaa4cHSJvB73hXxyUt5Yx51TJiVjB9GJ8gOe8jY8= user@shubham-pc
