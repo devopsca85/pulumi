@@ -4,8 +4,10 @@ import * as resources from "@pulumi/azure-native/resources";
 import * as network from "@pulumi/azure-native/network";
 import * as containerservice from "@pulumi/azure-native/containerservice";
 import * as compute from "@pulumi/azure-native/compute";
+import * as azure from "@pulumi/azure-nextgen";
 
 const projCfg = new pulumi.Config();
+const config = new pulumi.Config();
 const numWorkerNodes = projCfg.getNumber("numWorkerNodes") || 3;
 const k8sVersion = projCfg.get("kubernetesVersion") || "1.26.3";
 const prefixForDns = projCfg.get("prefixForDns") || "pulumi";
@@ -164,3 +166,43 @@ export const networkName = virtualNetwork.name;
 export const clusterName = managedCluster.name;
 export const kubeconfig = decoded;
 // export const publicIpAddress = publicIp.ipAddress;
+
+
+// Front Door Premium resource group
+const resourceGroupName = config.require("resourceGroupName");
+
+const frontdoor = new azure.frontdoor.FrontDoor("myFrontDoor", {
+    resourceGroupName: resourceGroupName,
+    frontendEndpoints: [{
+        name: "myFrontendEndpoint",
+        hostName: "example.com",
+    }],
+    backendPools: [{
+        name: "myBackendPool",
+        backends: [{
+            address: "backend1.azurewebsites.net",
+            httpPort: 80,
+            priority: 1,
+            weight: 50,
+        }],
+    }],
+    loadBalancingSettings: {
+        name: "myLoadBalancingSettings",
+        sampleSize: 4,
+        successfulSamplesRequired: 2,
+    },
+    routingRules: [{
+        name: "myRoutingRule",
+        frontendEndpoints: [{ item: "myFrontendEndpoint" }],
+        acceptedProtocols: ["Http"],
+        patternsToMatch: [{
+            pattern: "/path/*",
+        }],
+        routeConfiguration: {
+            name: "myRouteConfiguration",
+            backendPool: { item: "myBackendPool" },
+        },
+    }],
+});
+
+export const frontdoorName = frontdoor.name;
