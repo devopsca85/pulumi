@@ -69,7 +69,7 @@ const managedCluster = new containerservice.ManagedCluster("managedCluster", {
         vnetSubnetID: subnet1.id,
         //privateClusterEnabled: true, 
         //apiServerAccessProfile: {
-           // enablePrivateCluster: "true",
+        //enablePrivateCluster: "true",
     //}
        
 }
@@ -77,8 +77,8 @@ const managedCluster = new containerservice.ManagedCluster("managedCluster", {
     
     
     apiServerAccessProfile: {
-        authorizedIPRanges: ["0.0.0.0/0"],
-        enablePrivateCluster: false,
+        //authorizedIPRanges: ["0.0.0.0/0"],
+        enablePrivateCluster: true,
     },
     dnsPrefix: prefixForDns,
     enableRBAC: true,
