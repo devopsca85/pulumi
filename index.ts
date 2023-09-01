@@ -1,10 +1,11 @@
 
 import * as pulumi from "@pulumi/pulumi";
+import * as azure from "@pulumi/azure";
 import * as resources from "@pulumi/azure-native/resources";
 import * as network from "@pulumi/azure-native/network";
 import * as containerservice from "@pulumi/azure-native/containerservice";
 import * as compute from "@pulumi/azure-native/compute";
-import * as azure from "@pulumi/azure-nextgen";
+import * as azure_native from "@pulumi/azure-native";
 
 const projCfg = new pulumi.Config();
 const config = new pulumi.Config();
@@ -167,42 +168,42 @@ export const clusterName = managedCluster.name;
 export const kubeconfig = decoded;
 // export const publicIpAddress = publicIp.ipAddress;
 
-
-// Front Door Premium resource group
-const resourceGroupName = config.require("resourceGroupName");
-
-const frontdoor = new azure.frontdoor.FrontDoor("myFrontDoor", {
-    resourceGroupName: resourceGroupName,
-    frontendEndpoints: [{
-        name: "myFrontendEndpoint",
-        hostName: "example.com",
-    }],
-    backendPools: [{
-        name: "myBackendPool",
-        backends: [{
-            address: "backend1.azurewebsites.net",
-            httpPort: 80,
-            priority: 1,
-            weight: 50,
-        }],
-    }],
-    loadBalancingSettings: {
-        name: "myLoadBalancingSettings",
-        sampleSize: 4,
-        successfulSamplesRequired: 2,
-    },
+// FrontDoor Setup
+const exampleResourceGroup = new azure.core.ResourceGroup("exampleResourceGroup", {location: "West Europe"});
+const exampleFrontdoor = new azure.frontdoor.Frontdoor("exampleFrontdoor", {
+    resourceGroupName: exampleResourceGroup.name,
     routingRules: [{
-        name: "myRoutingRule",
-        frontendEndpoints: [{ item: "myFrontendEndpoint" }],
-        acceptedProtocols: ["Http"],
-        patternsToMatch: [{
-            pattern: "/path/*",
-        }],
-        routeConfiguration: {
-            name: "myRouteConfiguration",
-            backendPool: { item: "myBackendPool" },
+        name: "exampleRoutingRule1",
+        acceptedProtocols: [
+            "Http",
+            "Https",
+        ],
+        patternsToMatches: ["/*"],
+        frontendEndpoints: ["exampleFrontendEndpoint1"],
+        forwardingConfiguration: {
+            forwardingProtocol: "MatchRequest",
+            backendPoolName: "exampleBackendBing",
         },
     }],
+    backendPoolLoadBalancings: [{
+        name: "exampleLoadBalancingSettings1",
+    }],
+    backendPoolHealthProbes: [{
+        name: "exampleHealthProbeSetting1",
+    }],
+    backendPools: [{
+        name: "exampleBackendBing",
+        backends: [{
+            hostHeader: "www.bing.com",
+            address: "www.bing.com",
+            httpPort: 80,
+            httpsPort: 443,
+        }],
+        loadBalancingName: "exampleLoadBalancingSettings1",
+        healthProbeName: "exampleHealthProbeSetting1",
+    }],
+    frontendEndpoints: [{
+        name: "exampleFrontendEndpoint1",
+        hostName: "example-FrontDoor.azurefd.net",
+    }],
 });
-
-export const frontdoorName = frontdoor.name;
