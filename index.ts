@@ -1,209 +1,64 @@
-
-import * as pulumi from "@pulumi/pulumi";
 import * as azure from "@pulumi/azure";
+import * as pulumi from "@pulumi/pulumi";
 import * as resources from "@pulumi/azure-native/resources";
 import * as network from "@pulumi/azure-native/network";
 import * as containerservice from "@pulumi/azure-native/containerservice";
 import * as compute from "@pulumi/azure-native/compute";
 import * as azure_native from "@pulumi/azure-native";
 
-const projCfg = new pulumi.Config();
-const config = new pulumi.Config();
-const numWorkerNodes = projCfg.getNumber("numWorkerNodes") || 3;
-const k8sVersion = projCfg.get("kubernetesVersion") || "1.26.3";
-const prefixForDns = projCfg.get("prefixForDns") || "pulumi";
-const nodeVmSize = projCfg.get("nodeVmSize") || "Standard_DS2_v2";
-// The next two configuration values are required (no default can be provided)
-const mgmtGroupId = projCfg.require("mgmtGroupId");
-const sshPubKey = projCfg.require("sshPubKey"); 
+// Config and defaults
+const location = "EastUS2";
 
-// Create a new Azure Resource Group
-const resourceGroup = new resources.ResourceGroup("resourceGroup", {});
+// Create an Azure Resource Group
+const resourceGroup = new azure.core.ResourceGroup("demo-rg", {
+    location: location,
+    name: "demo-rg",
+});
 
-// Create a new Azure Virtual Network
-const virtualNetwork = new network.VirtualNetwork("virtualNetwork", {
-    addressSpace: {
-        addressPrefixes: ["10.0.0.0/16"],
-    },
+// Create an Azure Virtual Network
+const vnet = new azure.network.VirtualNetwork("demo2023", {
+    location: resourceGroup.location,
     resourceGroupName: resourceGroup.name,
+    addressSpaces: ["10.0.0.0/16"],
+    name: "demo2023",
 });
 
-// Create three subnets in the virtual network
-const subnet1 = new network.Subnet("subnet1", {
-    addressPrefix: "10.0.0.0/22",
+// Create an Azure KeyVault
+const keyVault = new azure.keyvault.KeyVault("demo-kv", {
+    location: resourceGroup.location,
     resourceGroupName: resourceGroup.name,
-    virtualNetworkName: virtualNetwork.name,
+    skuName: "standard",
+    tenantId: "<YOUR_AZURE_AD_TENANT_ID>",
+    name: "demo-kv",
 });
 
-const subnet2 = new network.Subnet("subnet2", {
-    addressPrefix: "10.0.4.0/22",
+// Create an Azure App Configuration
+const appConfig = new azure.appconfiguration.ConfigurationStore("demo-cfg", {
+    location: resourceGroup.location,
     resourceGroupName: resourceGroup.name,
-    virtualNetworkName: virtualNetwork.name,
+    sku: "standard",
+    name: "demo-cfg",
 });
 
-const subnet3 = new network.Subnet("subnet3", {
-    addressPrefix: "10.0.8.0/22",
+// Create a private Azure Kubernetes Cluster
+const kubernetesCluster = new azure.containerservice.KubernetesCluster("gwr-demo-aks", {
+    location: resourceGroup.location,
     resourceGroupName: resourceGroup.name,
-    virtualNetworkName: virtualNetwork.name,
+    defaultNodePool: {
+        name: "default",
+        nodeCount: 1,
+        vmSize: "Standard_D2_v2",
+    },
+    dnsPrefix: "aks",
+    privateClusterEnabled: true,
+    name: "gwr-demo-aks",
 });
 
-// Create an Azure Kubernetes Cluster
-const managedCluster = new containerservice.ManagedCluster("managedCluster", {
-    aadProfile: {
-        enableAzureRBAC: true,
-        managed: true,
-        adminGroupObjectIDs: [mgmtGroupId],
-        //enablePrivateCluster: true,
-    },
-    addonProfiles: {},
-    // Use multiple agent
-    agentPoolProfiles: [{
-        availabilityZones: ["1","2","3"],
-           // count: numWorkerNodes,
-            count: 3,
-        enableNodePublicIP: false,
-        mode: "System",
-        name: "systempool",
-        osType: "Linux",
-        osDiskSizeGB: 30,
-        type: "VirtualMachineScaleSets",
-        vmSize: nodeVmSize,
-        //  additional node pools to distribute across subnets
-        vnetSubnetID: subnet1.id,
-        //privateClusterEnabled: true, 
-        //apiServerAccessProfile: {
-        //enablePrivateCluster: "true",
-    //}
-       
-}
-],
-    
-    
-    apiServerAccessProfile: {
-        //authorizedIPRanges: ["0.0.0.0/0"],
-        enablePrivateCluster: true,
-    },
-    dnsPrefix: prefixForDns,
-    enableRBAC: true,
-    identity: {
-        type: "SystemAssigned",
-    },
-    kubernetesVersion: k8sVersion,
-    linuxProfile: {
-        adminUsername: "azureuser",
-        ssh: {
-            publicKeys: [{
-                keyData: sshPubKey,
-            }],
-        },
-    },
-    networkProfile: {
-        networkPlugin: "azure",
-        networkPolicy: "azure",
-        serviceCidr: "10.96.0.0/16",
-        dnsServiceIP: "10.96.0.10",
-    },
-    resourceGroupName: resourceGroup.name,
-});
+// Create Azure Front Door Premium
+//const frontDoor = new azure.network.frontDoor("gwrdemoaks", {
+  //  resourceGroupName: resourceGroup.name,
+   // location: resourceGroup.location,
+    // ... add more configurations as necessary
+//});
 
-
-const publicIpAddress = new network.PublicIPAddress("publicIpAddress", {
-    resourceGroupName: resourceGroup.name,
-    publicIPAllocationMethod: "Dynamic",
-});
-
-// Create a network interface for the VM
-const vmNetworkInterface = new network.NetworkInterface("vmNetworkInterface", {
-    resourceGroupName: resourceGroup.name,
-    ipConfigurations: [{
-        name: "vm-ip-config",
-        subnet: { id: subnet1.id },
-        privateIPAllocationMethod: "Dynamic",
-        publicIPAddress: { id: publicIpAddress.id },
-    }],
-});
-
-// Create a virtual machine
-const virtualMachine = new compute.VirtualMachine("virtualMachine", {
-    resourceGroupName: resourceGroup.name,
-    networkProfile: {
-        networkInterfaces: [{ id: vmNetworkInterface.id }],
-    },
-    osProfile: {
-        computerName: "jumpserver",
-        adminUsername: "jumpserver",
-         adminPassword: "jumpserver123!", 
-    },
-    storageProfile: {
-        osDisk: {
-            createOption: "FromImage",
-            name: "osdisk",
-            caching: "ReadWrite",
-        },
-        imageReference: {
-            publisher: "Canonical",
-            offer: "UbuntuServer",
-            sku: "18.04-LTS",
-            version: "latest",
-        },
-    },
-    hardwareProfile: {
-        vmSize:  "Standard_B1s", 
-    },
-});
-
-
-//  access the cluster
-const creds = containerservice.listManagedClusterUserCredentialsOutput({
-    resourceGroupName: resourceGroup.name,
-    resourceName: managedCluster.name,
-});
-const encoded = creds.kubeconfigs[0].value;
-const decoded = encoded.apply(enc => Buffer.from(enc, "base64").toString());
-
-//  some values for use 
-export const rgName = resourceGroup.name;
-export const networkName = virtualNetwork.name;
-export const clusterName = managedCluster.name;
-export const kubeconfig = decoded;
-// export const publicIpAddress = publicIp.ipAddress;
-
-// FrontDoor Setup
-const exampleResourceGroup = new azure.core.ResourceGroup("exampleResourceGroup", {location: "West Europe"});
-const exampleFrontdoor = new azure.frontdoor.Frontdoor("exampleFrontdoor", {
-    resourceGroupName: exampleResourceGroup.name,
-    routingRules: [{
-        name: "exampleRoutingRule1",
-        acceptedProtocols: [
-            "Http",
-            "Https",
-        ],
-        patternsToMatches: ["/*"],
-        frontendEndpoints: ["exampleFrontendEndpoint1"],
-        forwardingConfiguration: {
-            forwardingProtocol: "MatchRequest",
-            backendPoolName: "exampleBackendBing",
-        },
-    }],
-    backendPoolLoadBalancings: [{
-        name: "exampleLoadBalancingSettings1",
-    }],
-    backendPoolHealthProbes: [{
-        name: "exampleHealthProbeSetting1",
-    }],
-    backendPools: [{
-        name: "exampleBackendBing",
-        backends: [{
-            hostHeader: "www.bing.com",
-            address: "www.bing.com",
-            httpPort: 80,
-            httpsPort: 443,
-        }],
-        loadBalancingName: "exampleLoadBalancingSettings1",
-        healthProbeName: "exampleHealthProbeSetting1",
-    }],
-    frontendEndpoints: [{
-        name: "exampleFrontendEndpoint1",
-        hostName: "example-FrontDoor.azurefd.net",
-    }],
-});
+export const resourceGroupName = resourceGroup.name;
