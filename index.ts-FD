@@ -1,0 +1,44 @@
+import * as azure from "@pulumi/azure";
+import * as azure_native from "@pulumi/azure-native";
+
+//const config = new pulumi.Config();
+//const frontdoorUrl = config.require("frontdoor:url");
+
+const resourceGroup = new azure.core.ResourceGroup("resourceGroupName",{
+    location: "EastUS2",
+});
+    
+    const frontdoor = new azure_native.network.FrontDoor("frontdoor", {
+        resourceGroupName: resourceGroup.name,
+        location: "global",
+        // Other front door settings can be specified here.
+    });
+
+
+
+    healthProbeSettings: [{
+        name: "exampleProbeSetting",
+        enabledState: "Enabled",
+        path: "/",
+        protocol: "Http",
+        intervalInSeconds: 120
+    }]
+//frontendEndpoints: [{
+//    name: "examplefrontdoor50c0a30",
+ //   hostName: "examplefrontdoor50c0a30.azurefd.net",
+    //sessionAffinityEnabledState: "Disabled",
+//}],
+routingRules: [{
+    name: "exampleRoutingRule",
+    acceptedProtocols: ["Https"],
+    patternsToMatch: ["/*"],
+    frontendEndpoints: ["exampleFrontendEndpoint"],
+    forwardingConfiguration: {
+        backendPoolName: "exampleBackendBing",
+        cacheConfiguration: {
+            queryParameterStripDirective: "StripAll"
+        },
+    },
+}]
+
+//export const frontdoorUrl = frontdoor.frontendEndpoint[0].hostName;
