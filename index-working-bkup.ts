@@ -28,7 +28,6 @@ const kcName = config.require("kcName");
 const kcDefaultNodePoolName = config.require("kcDefaultNodePoolName");
 const kcDefaultNodePoolVmSize = config.require("kcDefaultNodePoolVmSize");
 const kcDefaultNodePoolNodeCount = parseInt(config.require("kcDefaultNodePoolNodeCount"));
-const kcVersion = config.require("kcVersion");
 const kcDnsPrefix = config.require("kcDnsPrefix");
 const kcIdentityType = config.require("kcIdentityType");
 const kcPrivateClusterEnabled = config.requireBoolean("kcPrivateClusterEnabled");
@@ -111,7 +110,6 @@ const cluster = new azure.containerservice.KubernetesCluster(kcName, {
   networkProfile: {
     networkPlugin: kcNetworkProfilePlugin,
   },
-  kubernetesVersion: kcVersion,
 });
 
 // Create a network interface for the VM
