@@ -1,5 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as azure from "@pulumi/azure";
+import * as azure_native from "@pulumi/azure-native";
 import * as network from "@pulumi/azure-native/network";
 
 const config = new pulumi.Config();
@@ -27,10 +28,15 @@ const vmSubnetAddressPrefix = config.require("vmSubnetAddressPrefix");
 const kcName = config.require("kcName");
 const kcDefaultNodePoolName = config.require("kcDefaultNodePoolName");
 const kcDefaultNodePoolVmSize = config.require("kcDefaultNodePoolVmSize");
-const kcDefaultNodePoolNodeCount = parseInt(config.require("kcDefaultNodePoolNodeCount"));
+const kcDefaultNodePoolNodeCount = parseInt(
+  config.require("kcDefaultNodePoolNodeCount")
+);
+const kcVersion = config.require("kcVersion");
 const kcDnsPrefix = config.require("kcDnsPrefix");
 const kcIdentityType = config.require("kcIdentityType");
-const kcPrivateClusterEnabled = config.requireBoolean("kcPrivateClusterEnabled");
+const kcPrivateClusterEnabled = config.requireBoolean(
+  "kcPrivateClusterEnabled"
+);
 const kcNetworkProfilePlugin = config.require("kcNetworkProfilePlugin");
 
 const networkInterface = config.require("networkInterface");
@@ -59,6 +65,19 @@ const vmstorageOsDiskCreateOption = config.require(
   "vmstorageOsDiskCreateOption"
 );
 const vmstorageOsDiskName = config.require("vmstorageOsDiskName");
+
+const natGatewayPublicIp = config.require("natGatewayPublicIp");
+const natAllocationMethod = config.require("natAllocationMethod");
+const natGatewayName = config.require("natGatewayName");
+const natIdleTimeoutInMinutes = parseInt(
+  config.require("natIdleTimeoutInMinutes")
+);
+
+const appConfigStoreName = config.require("appConfigStoreName");
+
+const vaultName = config.require("vaultName");
+const vaultObjectId = config.require("vaultObjectId");
+const vaultTenantId = config.require("vaultTenantId");
 
 //Frontdoor Premium Setup
 const resourceGroup = new azure.core.ResourceGroup(resourceGroupName, {
@@ -110,6 +129,7 @@ const cluster = new azure.containerservice.KubernetesCluster(kcName, {
   networkProfile: {
     networkPlugin: kcNetworkProfilePlugin,
   },
+  kubernetesVersion: kcVersion,
 });
 
 // Create a network interface for the VM
@@ -125,26 +145,125 @@ const vmNic = new azure.network.NetworkInterface(networkInterface, {
 });
 
 // Create the VM
-const vm = new azure.compute.VirtualMachine(vmName, {
+// const vm = new azure.compute.VirtualMachine(vmName, {
+//     resourceGroupName: resourceGroup.name,
+//     networkInterfaceIds: [vmNic.id],
+//     vmSize: vmSize,
+//    // dependsOn: [resourceGroup], // Ensure that VM depends on the resource group
+//     storageImageReference: {
+//       publisher: vmStorageImageReferencePublisher,
+//       offer: vmStorageImageReferenceOffer,
+//       sku: vmStorageImageReferenceSku,
+//       version: vmStorageImageReferenceVersion,
+//     },
+//     osProfile: {
+//       computerName: vmosProfileComputerName,
+//       adminUsername: vmosProfileAdminUsername,
+//       adminPassword: vmosProfileAdminPassword,
+//     },
+//     osProfileLinuxConfig: {
+//       disablePasswordAuthentication: vmosProfiledDisablePasswordAuthentication,
+//     },
+//     storageOsDisk: {
+//       createOption: vmstorageOsDiskCreateOption,
+//       name: vmstorageOsDiskName,
+//     },
+// });
+
+// Create a public IP address for the NAT gateway
+const publicIp = new azure.network.PublicIp(natGatewayPublicIp, {
   resourceGroupName: resourceGroup.name,
-  networkInterfaceIds: [vmNic.id],
-  vmSize: vmSize,
-  storageImageReference: {
-    publisher: vmStorageImageReferencePublisher,
-    offer: vmStorageImageReferenceOffer,
-    sku: vmStorageImageReferenceSku,
-    version: vmStorageImageReferenceVersion,
+  location: resourceGroupLocation,
+  allocationMethod: natAllocationMethod,
+  sku: "Standard",
+});
+
+// Create a NAT gateway
+const natGateway = new azure.network.NatGateway(natGatewayName, {
+  resourceGroupName: resourceGroup.name,
+  location: resourceGroupLocation,
+  idleTimeoutInMinutes: natIdleTimeoutInMinutes,
+});
+
+// Create an Azure App Configuration
+const configurationStore = new azure_native.appconfiguration.ConfigurationStore(
+  "configurationStore",
+  {
+    configStoreName: appConfigStoreName,
+    location: resourceGroupLocation,
+    resourceGroupName: resourceGroup.name,
+    sku: {
+      name: "Standard",
+    },
+  }
+);
+
+// Create an Azure Key Vault
+const vault = new azure_native.keyvault.Vault("vault", {
+  location: resourceGroupLocation,
+  properties: {
+    accessPolicies: [
+      {
+        objectId: vaultObjectId,
+        permissions: {
+          certificates: [
+            "get",
+            "list",
+            "delete",
+            "create",
+            "import",
+            "update",
+            "managecontacts",
+            "getissuers",
+            "listissuers",
+            "setissuers",
+            "deleteissuers",
+            "manageissuers",
+            "recover",
+            "purge",
+          ],
+          keys: [
+            "encrypt",
+            "decrypt",
+            "wrapKey",
+            "unwrapKey",
+            "sign",
+            "verify",
+            "get",
+            "list",
+            "create",
+            "update",
+            "import",
+            "delete",
+            "backup",
+            "restore",
+            "recover",
+            "purge",
+          ],
+          secrets: [
+            "get",
+            "list",
+            "set",
+            "delete",
+            "backup",
+            "restore",
+            "recover",
+            "purge",
+          ],
+        },
+        tenantId: vaultTenantId,
+      },
+    ],
+    enabledForDeployment: true,
+    enabledForDiskEncryption: true,
+    enabledForTemplateDeployment: true,
+    publicNetworkAccess: "Enabled",
+    sku: {
+      family: "A",
+      name: azure_native.keyvault.SkuName.Standard,
+    },
+    tenantId: vaultTenantId,
   },
-  osProfile: {
-    computerName: vmosProfileComputerName,
-    adminUsername: vmosProfileAdminUsername,
-    adminPassword: vmosProfileAdminPassword,
-  },
-  osProfileLinuxConfig: {
-    disablePasswordAuthentication: vmosProfiledDisablePasswordAuthentication,
-  },
-  storageOsDisk: {
-    createOption: vmstorageOsDiskCreateOption,
-    name: vmstorageOsDiskName,
-  },
+  resourceGroupName: resourceGroup.name,
+  vaultName: vaultName,
 });
